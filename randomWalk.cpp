@@ -20,30 +20,32 @@ const int r = 2; //COMMON RATIO r in GEOMTRIC PROGRESSION
 //For Binary Output
 char buffer[100];
 
+//Max Geometric Progression terms
+const int maxGP = 30;
+
 int main(int argc, char const* argv[])
 {
     //SET OUTPUT TEXT FILES
     ofstream probTwoOut;
     ofstream posMean;
-    ofstream gpOut;
+    ofstream gpOut; //GEOMETRIC PROGRESSION FILE
 
     probTwoOut.open("positionVSProbabilityOutput2.csv"); //FILE FOR SECOND PROBABILITY OUTPUT
     posMean.open("positionVSMeanSquareOutput.csv");
-    gpOut.open("geometricProgression.csv");
+    gpOut.open("geometricProgression.txt"); //GEOMETRIC PROGRESSION FILE
 
     //====================================================//
     //=== GEOMETRIC PROGRESSION ==========================//
     unsigned long int* theGP = new unsigned long int[numSteps]; //WILL CONTAIN THE PROGRESSION 
-    float* stepsTracker = new float[numSteps]; //TRACKS ALL STEPS TAKEN
+    float* stepsTracker = new float[numSteps * numWalkers]; //TRACKS ALL STEPS TAKEN
     int currentGPValue = 0; //STARTS AT POSITION 0 IN THE theGP array, THIS WILL BE USED TO CHECK IF THE CURRENT STEP TAKEN IS EQUAL TO THE NEXT GEOMTRIC PROGRESSION
     //Get the progression up to 30. It gets too big after 30.
-    for (int N = 1; N <= 30; N++) {
+    for (int N = 1; N <= maxGP; N++) {
         theGP[N - 1] = a * pow(r, N - 1);
     }
-    for (int i = 0; i < numSteps; i++)
+    for (int i = 0; i < numSteps*numWalkers; i++)
         stepsTracker[i] = 0; //Initialize tracker
-
-    fstream myBinFile("data.bin", ios::out | ios::app | ios::binary);   //BINARY FILE OUTPUT
+    int trackercounter = 0;
     //=====================================================//
 
     //aStepSquared IS WHERE A STEP OF A WALKER IS SQUARED
@@ -113,32 +115,44 @@ int main(int argc, char const* argv[])
 
             //cout << "==== The squared displacement is x^2 = " << aStepSquared[itime] << endl << endl;
 
+            //RECORDS ALL STEPS TAKEN BY ALL WALKERS
+            //TO BE USED IN GEOMETRIC PROGRESSION
+            stepsTracker[trackercounter++] = currentPosition;
 
-            //================================================================================================//
-            //====================== GEOMETRIC PROGRESSION ===================================================//
-            //CHECK IF CURRENT STEP IS THE NEXT GEOMETRIC PROGRESSION
-            //IF IT IS, DISPLAY STEPS TAKEN TO RECH THE PROGRESSION
-            stepsTracker[itime] = currentPosition;
-            if (itime == theGP[currentGPValue]) {
-                gpOut << "WLKR " << kWalkr + 1 << ", TIME " << theGP[currentGPValue] << ", ";
-                //output steps taken
-                myBinFile.write((char*)&theGP[currentGPValue], sizeof(unsigned long int)); //OUTPUT TO BINARY FILE THE CURRENT GEEOMETRIC PROGRESSION VALUE
-                for (int track = 0; track < itime; track++) {
-                    gpOut << "Position: " << float(stepsTracker[track]) << ", ";
-                    myBinFile.write((char*)&stepsTracker[track], sizeof(float)); //OUTPUT TO BINARY FILE THE STEPS TO REACH THE CURRENT GEOMETRIC PROGRESSION VALUE
-                }
-                gpOut << endl; 
-                myBinFile<< "\r\n";
-                currentGPValue = currentGPValue + 1; //Go to next progression value
-            }
-            //======================================END FOR GEOMETRIC PROGRESSION=============================//
-            //================== RESET currentGPValue FOR THE NEXT WALKER (SEE BELOW THIS ONE) ===============//
         }
-        currentGPValue = 0; //GO BACK TO FIRST PROGRESSION VALUE FOR THE NEXT WALKER
 
-        //cout << endl;
         //INCREMENT countNumberOfVisits[] EVERYTIME currentPosition IS VISITED
         countNumberOfVisits[currentPosition + numSteps] += 1;
+    }
+
+    //FOR LOOP FOR EACH GOEMETRIC PROGRESSION VALUE
+    for (int gpVal = 0; gpVal < maxGP; gpVal++) {
+        //CHECK IF THE GP VALUE IS GREATER THAN NUMSTEPS. IF GREATER, STOP OUTPUT
+        if (theGP[gpVal] > numSteps)
+            break;
+        //FOR LOOP FOR EACH WALKER
+        for (int wlkr = 0; wlkr < numWalkers; wlkr++) {
+            
+            //THIS WILL HOLD ALL STEPS TAKEN BY CURRENT WALKER
+            float* allStepsOfWalker = new float[numSteps];
+
+            //TAKE ALL RECORDED STEPS OF CURRENT WALKER FROM stepsTracker EARLIER AND STORE THEM TO allStepsOfWalker 
+            for (int i = 0; i < numSteps; i++) {
+                allStepsOfWalker[i] = stepsTracker[wlkr * numSteps + i];
+            }
+            //FOR LOOP TO CHECK STEPS TAKEN
+            for (int step = 1; step <= numSteps; step++) {
+                //IF CURRENT STEP NO. IS EQUAL TO CURRENT GP VALUE theGP[gpVal]
+                //THEN DISPLAY ALL STEPS TAKEN BY CURRENT WALKER UP TO THE CURRENT GEOMETRIC PROGRESSION VALUE
+                if (step == theGP[gpVal]) {
+                    gpOut << "GP " << theGP[gpVal] << " WLKR " << wlkr + 1 << " STEPS: ";
+                    for (int i = 0; i < step; i++) {
+                        gpOut << allStepsOfWalker[i] << " ";
+                    }
+                    gpOut << endl;
+                }
+            }
+        }
     }
 
     //Mean Square
@@ -193,7 +207,7 @@ int main(int argc, char const* argv[])
         probTwoOut << i - numSteps << ", " << probability[i] << endl;  // Output(x,y): POSITION VS PROBABILITY
     }
 
-    myBinFile.close();
+    //myBinFile.close();
     probTwoOut.close();
     posMean.close();
     gpOut.close();
